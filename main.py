@@ -1,18 +1,19 @@
 import pygame
 import random
 import sys
+import os # for high score implementation
 
 pygame.init() # initialize the game
 screen = pygame.display.set_mode((1280 , 720)) # setting the width and height
 clock = pygame.time.Clock() # initializing the clock
 pygame.display.set_caption('Dino Game')
 
-game_font = pygame.font.Font('/Users/mbpro/Desktop/dino_game/assets/PressStart2P-Regular.ttf' , 24)
 
+game_font = pygame.font.Font('/Users/mbpro/Desktop/dino_game/assets/PressStart2P-Regular.ttf' , 24)
+small_game_font = pygame.font.Font('/Users/mbpro/Desktop/dino_game/assets/PressStart2P-Regular.ttf' , 18)
 # cloud, dino, cactus, ground, ptero --> classes
 
 # CLASSES
-
 
 class Cloud(pygame.sprite.Sprite): # inheriting funtionalities from already present pygame Sprite
     def __init__(self, image, x_pos, y_pos):
@@ -53,9 +54,9 @@ class Dino(pygame.sprite.Sprite): # inheriting funtionalities from already prese
         self.image = self.running_sprites[self.current_image]#
         self.rect = self.image.get_rect(center = (self.x_pos, self.y_pos))
         # filled the dino inside it
-        self.velocity = 60# its just a constant velocity
+        self.velocity = 80# its just a constant velocity
         # increased velocity so that it stays in the air for longer
-        self.gravity = 3.5
+        self.gravity = 3.3
         # Decrease gravity to slow down the descent
         self.ducking = False # its a running dino image
 
@@ -142,21 +143,44 @@ class Ptero(pygame.sprite.Sprite):
         self.x_pos -= game_speed
         self.rect = self.image.get_rect(center =(self.x_pos , self.y_pos))
 
+def display_score_and_high_score():
+    # Display current player score
+    player_score_surface = game_font.render(str(int(player_score)), True, "black")
+    screen.blit(player_score_surface, (1150, 10))
+    
+    # Display high score
+    high_score_surface = game_font.render(f"High Score: {high_score}", True, "black")
+    screen.blit(high_score_surface, (500, 10))  # Display high score on screen
 
 
 
-# global variables
+# Global variables
 
 #jump_sfx = pygame.mixer.Sound('/Users/mbpro/Desktop/dino_game/assets/sfx/jump.mp3')
 game_speed = 5
 jump_count = 10
 player_score = 0
+high_score = 0
+high_score_file = 'high_score.txt'
+high_score_sound_played = False
+
+# Load the high score from the file if it exists
+
+if os.path.exists(high_score_file):
+    with open(high_score_file, 'r') as file:
+        content = file.read().strip()  # Read the file and # strip() removes unnecessary whitespaces or any other charecters
+        if content:  # Check if content is not empty
+            try:
+                high_score = int(content)  # Try converting the content to an integer
+            except ValueError:
+                high_score = 0  # If conversion fails, set high score to 0
+
 game_over = False
 obstacle_timer = 0
 obstacle_spawn = False
-obstacle_cooldown = 1700
+obstacle_cooldown = 1400
 
-# surfaces
+# Surfaces
 
 ground = pygame.image.load("/Users/mbpro/Desktop/dino_game/assets/ground.png")
 ground = pygame.transform.scale(ground, (1280, 20)) 
@@ -166,7 +190,7 @@ ground_rect = ground.get_rect(center = (640, 400))
 cloud = pygame.image.load("/Users/mbpro/Desktop/dino_game/assets/cloud.png")
 cloud = pygame.transform.scale(cloud, (200, 80))
 
-# groups
+# Groups
 
 cloud_group = pygame.sprite.Group()
 obstacle_group = pygame.sprite.Group()
@@ -194,14 +218,37 @@ pygame.time.set_timer(CLOUD_EVENT, 4000) # clouds will appear on screen ever 3 s
 
 # FUNCTIONS
 
+
 def end_game():
-    global player_score, game_speed
+    global player_score, game_speed , high_score
+    
+    # Check if current score is higher than high score
+    if player_score > high_score:
+        high_score = int(player_score)
+
+        # Save new high score to the text file
+        with open(high_score_file , 'w') as file:
+            file.write(str(high_score))
+
+
     game_over_text = game_font.render("Game Over!", True, "black")
     game_over_rect = game_over_text.get_rect(center=(640, 300))
+
     score_text = game_font.render(f"Score: {int(player_score)}", True, "black")
     score_rect = score_text.get_rect(center=(640, 340))
+    
+    ins_text = small_game_font.render("Press SPACE to restart" , True, "grey")
+    ins_rect = ins_text.get_rect(center = (640 , 490))
+
+    high_score_text = game_font.render(f"High Score: {high_score}", True, "black")
+    high_score_rect = high_score_text.get_rect(center=(640, 380))
+
     screen.blit(game_over_text, game_over_rect)
     screen.blit(score_text, score_rect)
+    screen.blit(high_score_text, high_score_rect)
+    screen.blit(ins_text, ins_rect)
+
+
     game_speed = 5
     cloud_group.empty()
     obstacle_group.empty()
@@ -249,9 +296,16 @@ while True:
     
     if not game_over:
         game_speed += 0.0025 # to increase speed of game and make the game more challenging
+        obstacle_cooldown +=0.0005
 
         if round(player_score, 1) % 100 == 0 and int(player_score) >0:
             points_sfx.play()
+        
+        # High score sfx logic
+
+        if player_score > high_score and not high_score_sound_played: # if high score crossed
+            points_sfx.play() # Play the high score sound
+            high_score_sound_played = True # ensure the sound is played only
         
         if pygame.time.get_ticks() - obstacle_timer >= obstacle_cooldown:
             obstacle_spawn = True
@@ -270,9 +324,8 @@ while True:
                 obstacle_spawn = False
         
         player_score += 0.1
-        player_score_surface = game_font.render(
-            str(int(player_score)), True, ("black"))
-        screen.blit(player_score_surface, (1150,10)) #showing the score
+
+        display_score_and_high_score()
 
         cloud_group.update()
         cloud_group.draw(screen)
@@ -295,6 +348,6 @@ while True:
             ground_x = 0
 
     
-    clock.tick(90) # og = 60
+    clock.tick(100) # og = 60
     pygame.display.update()
 obstacle_group.empty()
